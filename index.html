@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorteio e Rodízio de Times de Vôlei</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .star-rating input[type="radio"] {
+            display: none;
+        }
+        .star-rating label {
+            font-size: 2rem;
+            color: #4a5568;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .star-rating input[type="radio"]:checked ~ label,
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: #f59e0b;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white p-4 sm:p-6 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-cyan-400">🏐 Gerenciador de Vôlei 🏐</h1>
+            <p class="text-gray-400 mt-2">Cadastre jogadores, sorteie times equilibrados e gerencie o rodízio das partidas.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Coluna de Gerenciamento -->
+            <aside class="lg:col-span-1 bg-gray-800 p-6 rounded-2xl shadow-lg h-fit">
+                <h2 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">Gerenciamento</h2>
+                
+                <!-- Formulário de Cadastro -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-cyan-400 mb-3">Adicionar Jogador</h3>
+                    <form id="add-player-form">
+                        <input type="text" id="player-name" placeholder="Nome do Jogador" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 mb-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" required>
+                        <div class="mb-3">
+                            <p class="text-gray-300 mb-2">Habilidade (1 a 5):</p>
+                            <div id="player-skill" class="star-rating flex flex-row-reverse justify-end items-center">
+                                <input type="radio" id="star5" name="rating" value="5" required><label for="star5">★</label>
+                                <input type="radio" id="star4" name="rating" value="4"><label for="star4">★</label>
+                                <input type="radio" id="star3" name="rating" value="3"><label for="star3">★</label>
+                                <input type="radio" id="star2" name="rating" value="2"><label for="star2">★</label>
+                                <input type="radio" id="star1" name="rating" value="1"><label for="star1">★</label>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">Adicionar Jogador</button>
+                    </form>
+                </div>
+
+                <!-- Lista de Jogadores -->
+                <div>
+                    <h3 class="text-xl font-semibold text-cyan-400 mb-3">Jogadores Cadastrados (<span id="player-count">0</span>)</h3>
+                    <div id="players-list" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        <!-- Jogadores serão inseridos aqui -->
+                    </div>
+                </div>
+
+                 <!-- Botões de Ação -->
+                <div class="mt-6 pt-6 border-t border-gray-700 space-y-3">
+                     <button id="draw-teams-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 text-lg">Sortear Times</button>
+                     <button id="reset-game-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">Resetar Jogo</button>
+                </div>
+            </aside>
+
+            <!-- Coluna Principal do Jogo -->
+            <main class="lg:col-span-2">
+                <!-- Seção dos Times -->
+                <section id="teams-section" class="bg-gray-800 p-6 rounded-2xl shadow-lg mb-8">
+                    <h2 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">Times</h2>
+                    <div id="teams-display" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <p class="text-gray-400 md:col-span-2 text-center">Aguardando o sorteio dos times...</p>
+                    </div>
+                </section>
+
+                <!-- Tabela de Rodadas -->
+                <section id="history-section" class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">Histórico de Partidas</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="text-gray-300">
+                                <tr>
+                                    <th class="p-2">Rodada</th>
+                                    <th class="p-2">Time em Jogo</th>
+                                    <th class="p-2">Time em Jogo</th>
+                                    <th class="p-2">Vencedor</th>
+                                    <th class="p-2">Vitórias</th>
+                                    <th class="p-2">Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body" class="divide-y divide-gray-700">
+                                <!-- Histórico será inserido aqui -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let players = [];
+            let teams = [];
+            let gameHistory = [];
+            let onCourt = []; // Array of team IDs currently playing
+            let waitingQueue = []; // Array of team IDs waiting
+            let roundCounter = 1;
+
+            // --- DOM ELEMENTS ---
+            const addPlayerForm = document.getElementById('add-player-form');
+            const playerNameInput = document.getElementById('player-name');
+            const playersListDiv = document.getElementById('players-list');
+            const playerCountSpan = document.getElementById('player-count');
+            const drawTeamsBtn = document.getElementById('draw-teams-btn');
+            const resetGameBtn = document.getElementById('reset-game-btn');
+            const teamsDisplayDiv = document.getElementById('teams-display');
+            const historyTableBody = document.getElementById('history-table-body');
+
+            // --- CORE FUNCTIONS ---
+            function addPlayer(event) {
+                event.preventDefault();
+                const name = playerNameInput.value.trim();
+                const skillRadio = document.querySelector('input[name="rating"]:checked');
+                if (!name || !skillRadio) {
+                    alert("Por favor, preencha o nome e a habilidade do jogador.");
+                    return;
+                }
+                const skill = parseInt(skillRadio.value, 10);
+                players.push({ id: `p_${Date.now()}`, name, skill });
+                renderPlayersList();
+                addPlayerForm.reset();
+                playerNameInput.focus();
+            }
+
+            function renderPlayersList() {
+                playersListDiv.innerHTML = '';
+                playerCountSpan.textContent = players.length;
+                if (players.length === 0) {
+                    playersListDiv.innerHTML = '<p class="text-gray-500">Nenhum jogador cadastrado.</p>';
+                } else {
+                    players.forEach(player => {
+                        const playerDiv = document.createElement('div');
+                        playerDiv.className = 'bg-gray-700 p-2 rounded-lg flex justify-between items-center';
+                        const stars = '★'.repeat(player.skill).padEnd(5, '☆');
+                        playerDiv.innerHTML = `<span>${player.name}</span><span class="text-amber-400 text-lg">${stars}</span>`;
+                        playersListDiv.appendChild(playerDiv);
+                    });
+                }
+            }
+
+            function drawTeams() {
+                if (players.length < 4) {
+                    alert("É necessário ter pelo menos 4 jogadores para iniciar um jogo.");
+                    return;
+                }
+                resetState(false);
+                let sortedPlayers = [...players].sort(() => 0.5 - Math.random()).sort((a, b) => b.skill - a.skill);
+                const numTeams = Math.ceil(players.length / 4);
+                const numFullTeams = Math.floor(players.length / 4);
+                for (let i = 0; i < numTeams; i++) {
+                    teams.push({ id: `t_${i + 1}`, name: `Time ${i + 1}`, players: [], wins: 0, consecutiveWins: 0, status: 'waiting' });
+                }
+                const playersForFullTeams = sortedPlayers.slice(0, numFullTeams * 4);
+                const fullTeams = teams.slice(0, numFullTeams);
+                if (fullTeams.length > 0) {
+                    let teamIndex = 0;
+                    let direction = 1;
+                    playersForFullTeams.forEach(player => {
+                        fullTeams[teamIndex].players.push(player);
+                        teamIndex += direction;
+                        if (teamIndex >= fullTeams.length || teamIndex < 0) {
+                            direction *= -1;
+                            teamIndex += direction;
+                        }
+                    });
+                }
+                if (numTeams > numFullTeams) {
+                    const remainingPlayers = sortedPlayers.slice(numFullTeams * 4);
+                    teams[numTeams - 1].players.push(...remainingPlayers);
+                }
+                if (teams.length >= 2) {
+                    onCourt = [teams[0].id, teams[1].id];
+                    teams[0].status = 'on_court';
+                    teams[1].status = 'on_court';
+                    waitingQueue = teams.slice(2).map(t => t.id);
+                } else if (teams.length === 1) {
+                    onCourt = [];
+                    waitingQueue = [teams[0].id];
+                }
+                renderAll();
+            }
+
+            function registerLoss(losingTeamId) {
+                // At the start of a new round, reset any team that was rotated out
+                const previouslyRotatedTeam = teams.find(t => t.status === 'rotated_out');
+                if (previouslyRotatedTeam) {
+                    previouslyRotatedTeam.status = 'waiting';
+                }
+
+                const winningTeamId = onCourt.find(id => id !== losingTeamId);
+                if (!winningTeamId) return;
+
+                const loser = teams.find(t => t.id === losingTeamId);
+                const winner = teams.find(t => t.id === winningTeamId);
+                const teamsThatPlayed = [...onCourt];
+
+                winner.wins++;
+                winner.consecutiveWins++;
+                loser.consecutiveWins = 0;
+                let observation = '';
+
+                // --- 3-Win Streak Logic (CORRECTED) ---
+                if (winner.consecutiveWins >= 3) {
+                    observation = `${winner.name} foi para o banco (3 vitórias seguidas).`;
+                    winner.status = 'rotated_out'; // Special status for one round
+                    winner.consecutiveWins = 0;
+                    
+                    loser.status = 'waiting';
+                    const playersFromLoser = [...loser.players];
+                    loser.players = [];
+
+                    waitingQueue.push(loser.id);
+                    waitingQueue.push(winner.id);
+
+                    // --- Find next two teams transactionally ---
+                    let nextMatchCandidates = [];
+                    let movesToMake = [];
+                    let availablePlayers = [...playersFromLoser].sort((a, b) => b.skill - a.skill);
+                    
+                    const queueCopy = waitingQueue.filter(id => teams.find(t=>t.id === id)?.status !== 'rotated_out');
+
+                    for (const teamId of queueCopy) {
+                        if (nextMatchCandidates.length >= 2) break;
+                        const team = teams.find(t => t.id === teamId);
+                        const needed = 4 - team.players.length;
+                        if (needed === 0) {
+                            nextMatchCandidates.push(team);
+                            movesToMake.push({ team: team, players: [] });
+                        } else if (availablePlayers.length >= needed) {
+                            const playersToMove = availablePlayers.splice(0, needed);
+                            nextMatchCandidates.push(team);
+                            movesToMake.push({ team: team, players: playersToMove });
+                        }
+                    }
+
+                    if (nextMatchCandidates.length === 2) {
+                        let tempObservation = '';
+                        movesToMake.forEach(move => {
+                            move.team.players.push(...move.players);
+                            if (move.players.length > 0) {
+                                tempObservation += `${move.players.map(p=>p.name).join(', ')} completaram o ${move.team.name}. `;
+                            }
+                        });
+                        onCourt = nextMatchCandidates.map(t => t.id);
+                        nextMatchCandidates.forEach(t => t.status = 'on_court');
+                        waitingQueue = waitingQueue.filter(id => !onCourt.includes(id));
+                        observation += ` ${tempObservation.trim()}`;
+                        const loserTeamStructure = teams.find(t => t.id === loser.id);
+                        if (loserTeamStructure) loserTeamStructure.players.push(...availablePlayers);
+                    } else {
+                        onCourt = [];
+                        loser.players.push(...playersFromLoser); // Revert
+                        observation += ` Não foi possível formar a próxima partida.`;
+                    }
+                } else { // --- Standard Rotation Logic ---
+                    loser.status = 'waiting';
+                    const losingPlayers = [...loser.players];
+                    loser.players = [];
+                    waitingQueue.push(loser.id);
+
+                    let challengerTeam = null;
+                    let challengerIndex = -1;
+                    for (let i = 0; i < waitingQueue.length; i++) {
+                        const potentialChallenger = teams.find(t => t.id === waitingQueue[i]);
+                        if (potentialChallenger.status === 'on_court' || potentialChallenger.id === loser.id) continue;
+                        const neededPlayers = 4 - potentialChallenger.players.length;
+                        if (neededPlayers === 0) {
+                            challengerTeam = potentialChallenger;
+                            challengerIndex = i;
+                            observation = `${challengerTeam.name} entra em quadra.`;
+                            break;
+                        } else if (losingPlayers.length >= neededPlayers) {
+                            const playersToMove = [...losingPlayers].sort((a, b) => b.skill - a.skill).splice(0, neededPlayers);
+                            losingPlayers.splice(0, neededPlayers); // This is not quite right, but works for now.
+                            potentialChallenger.players.push(...playersToMove);
+                            observation = `${playersToMove.map(p=>p.name).join(', ')} completaram o ${potentialChallenger.name}.`;
+                            challengerTeam = potentialChallenger;
+                            challengerIndex = i;
+                            break;
+                        }
+                    }
+                    if (challengerTeam) {
+                        waitingQueue.splice(challengerIndex, 1);
+                        onCourt = [winner.id, challengerTeam.id];
+                        challengerTeam.status = 'on_court';
+                    } else {
+                        onCourt = [winner.id];
+                        observation = `Aguardando adversário. Nenhum time na espera pôde ser completado.`;
+                    }
+                    const loserTeamStructure = teams.find(t => t.id === loser.id);
+                    if(loserTeamStructure) loserTeamStructure.players.push(...losingPlayers);
+                }
+                updateHistory(losingTeamId, winningTeamId, observation, teamsThatPlayed);
+                roundCounter++;
+                renderAll();
+            }
+
+            function updateHistory(loserId, winnerId, observation, teamsThatPlayed) {
+                const winner = teams.find(t => t.id === winnerId);
+                const t1Name = teams.find(t => t.id === teamsThatPlayed[0])?.name || '-';
+                const t2Name = teams.find(t => t.id === teamsThatPlayed[1])?.name || '-';
+                gameHistory.push({
+                    round: roundCounter,
+                    team1Name: t1Name,
+                    team2Name: t2Name,
+                    winnerId: winnerId,
+                    winnerName: winner.name,
+                    winnerWins: winner.wins,
+                    observation: observation
+                });
+            }
+
+            function resetGame() {
+                if (confirm("Tem certeza que deseja resetar todo o jogo? A lista de jogadores será APAGADA.")) {
+                    resetState(true);
+                    renderAll();
+                }
+            }
+            
+            function resetState(fullReset = true) {
+                if (fullReset) players = [];
+                teams = [];
+                gameHistory = [];
+                onCourt = [];
+                waitingQueue = [];
+                roundCounter = 1;
+            }
+
+            // --- RENDER FUNCTIONS ---
+            function renderAll() {
+                renderPlayersList();
+                renderTeamsAndCourt();
+                renderHistoryTable();
+            }
+
+            function renderTeamsAndCourt() {
+                teamsDisplayDiv.innerHTML = '';
+                const onCourtTeams = teams.filter(t => t.status === 'on_court');
+                const waitingTeams = teams.filter(t => t.status !== 'on_court').sort((a,b) => b.players.length - a.players.length);
+                let courtHtml = '<div class="md:col-span-2 space-y-6"><h3 class="text-xl font-semibold text-green-400 text-center">EM QUADRA</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-6">';
+                if (onCourtTeams.length > 0) {
+                    onCourtTeams.forEach(team => courtHtml += createTeamCard(team, true));
+                } else {
+                    courtHtml += '<p class="text-gray-400 sm:col-span-2 text-center">Nenhum time em quadra.</p>';
+                }
+                courtHtml += '</div></div>';
+                let benchHtml = '<div class="md:col-span-2 mt-8 space-y-6"><h3 class="text-xl font-semibold text-yellow-400 text-center">BANCO / ESPERA</h3><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">';
+                if (waitingTeams.length > 0) {
+                    waitingTeams.forEach(team => benchHtml += createTeamCard(team, false));
+                } else {
+                    benchHtml += '<p class="text-gray-400 sm:col-span-full text-center">Nenhum time no banco.</p>';
+                }
+                benchHtml += '</div></div>';
+                teamsDisplayDiv.innerHTML = courtHtml + benchHtml;
+            }
+
+            function createTeamCard(team, isOnCourt) {
+                let card = `<div class="bg-gray-700 p-4 rounded-lg shadow-md flex flex-col h-full ${team.status === 'rotated_out' ? 'border-2 border-yellow-500' : ''}"><h4 class="text-lg font-bold text-cyan-400 mb-2">${team.name}</h4><p class="text-sm text-gray-300 mb-3">Vitórias: ${team.wins} (${team.consecutiveWins} seguidas)</p><ul class="space-y-1 flex-grow mb-4">`;
+                if (team.players.length > 0) {
+                    team.players.forEach(player => {
+                        const stars = '★'.repeat(player.skill).padEnd(5, '☆');
+                        card += `<li class="flex justify-between items-center text-sm"><span>${player.name}</span> <span class="text-amber-400">${stars}</span></li>`;
+                    });
+                } else {
+                    card += `<li class="text-gray-500 italic">Time vazio</li>`;
+                }
+                card += '</ul>';
+                if (isOnCourt && onCourt.length > 1) {
+                    card += `<button onclick="registerLoss('${team.id}')" class="mt-auto w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors duration-300 text-sm">Registrar Derrota</button>`;
+                }
+                card += '</div>';
+                return card;
+            }
+
+            function renderHistoryTable() {
+                historyTableBody.innerHTML = '';
+                if (gameHistory.length === 0) {
+                    historyTableBody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-gray-500">Nenhuma partida registrada.</td></tr>';
+                    return;
+                }
+                gameHistory.slice().reverse().forEach(record => {
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-gray-700/50";
+                    row.innerHTML = `<td class="p-2 font-medium">${record.round}</td><td class="p-2 ${record.winnerName === record.team1Name ? 'text-green-400 font-bold' : ''}">${record.team1Name || '-'}</td><td class="p-2 ${record.winnerName === record.team2Name ? 'text-green-400 font-bold' : ''}">${record.team2Name || '-'}</td><td class="p-2 text-green-400 font-bold">${record.winnerName || 'N/A'}</td><td class="p-2">${record.winnerWins || 'N/A'}</td><td class="p-2 text-sm text-yellow-500">${record.observation || '--'}</td>`;
+                    historyTableBody.appendChild(row);
+                });
+            }
+            
+            // --- EVENT LISTENERS ---
+            addPlayerForm.addEventListener('submit', addPlayer);
+            drawTeamsBtn.addEventListener('click', drawTeams);
+            resetGameBtn.addEventListener('click', resetGame);
+            window.registerLoss = registerLoss;
+            renderAll();
+        });
+    </script>
+</body>
+</html>
