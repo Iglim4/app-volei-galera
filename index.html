@@ -17,14 +17,28 @@
         }
         .star-rating label {
             font-size: 2rem;
-            color: #4a5568;
+            color: #4a5568; /* gray-600 */
             cursor: pointer;
             transition: color 0.2s;
         }
         .star-rating input[type="radio"]:checked ~ label,
         .star-rating label:hover,
         .star-rating label:hover ~ label {
-            color: #f59e0b;
+            color: #f59e0b; /* amber-500 */
+        }
+        /* Custom scrollbar for player list */
+        #players-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        #players-list::-webkit-scrollbar-track {
+            background: #1f2937; /* gray-800 */
+        }
+        #players-list::-webkit-scrollbar-thumb {
+            background-color: #4b5563; /* gray-600 */
+            border-radius: 4px;
+        }
+        #players-list::-webkit-scrollbar-thumb:hover {
+            background-color: #6b7280; /* gray-500 */
         }
     </style>
 </head>
@@ -32,7 +46,7 @@
     <div class="max-w-7xl mx-auto">
         <header class="text-center mb-8">
             <h1 class="text-3xl sm:text-4xl font-bold text-cyan-400">🏐 Gerenciador de Vôlei 🏐</h1>
-            <p class="text-gray-400 mt-2">Cadastre jogadores, sorteie times equilibrados e gerencie o rodízio das partidas.</p>
+            <p class="text-gray-400 mt-2">Cadastre jogadores, sorteie times e adicione novos jogadores a qualquer momento.</p>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -67,9 +81,9 @@
                     </div>
                 </div>
 
-                 <!-- Botões de Ação -->
+                <!-- Botões de Ação -->
                 <div class="mt-6 pt-6 border-t border-gray-700 space-y-3">
-                     <button id="draw-teams-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 text-lg">Sortear Times</button>
+                     <button id="draw-teams-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 text-lg">Sortear Times Iniciais</button>
                      <button id="reset-game-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">Resetar Jogo</button>
                 </div>
             </aside>
@@ -109,6 +123,23 @@
         </div>
     </div>
 
+    <!-- Modal de Confirmação -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 id="modal-title" class="text-xl font-bold mb-4">Confirmar Ação</h3>
+            <p id="modal-body" class="text-gray-300 mb-6">Você tem certeza?</p>
+            <div class="flex justify-end gap-4">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg font-semibold">Cancelar</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-semibold">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerta Customizado -->
+    <div id="custom-alert" class="fixed top-5 left-1/2 -translate-x-1/2 bg-cyan-500 text-white px-6 py-3 rounded-lg shadow-lg hidden z-50">
+        <p id="custom-alert-message">Mensagem de alerta!</p>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- STATE MANAGEMENT ---
@@ -128,6 +159,56 @@
             const resetGameBtn = document.getElementById('reset-game-btn');
             const teamsDisplayDiv = document.getElementById('teams-display');
             const historyTableBody = document.getElementById('history-table-body');
+            const confirmModal = document.getElementById('confirm-modal');
+            const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+            const modalCancelBtn = document.getElementById('modal-cancel-btn');
+            const customAlert = document.getElementById('custom-alert');
+            const customAlertMessage = document.getElementById('custom-alert-message');
+
+            let confirmCallback = null;
+
+            // --- MODAL & ALERT FUNCTIONS ---
+            function showModal(message, callback) {
+                document.getElementById('modal-body').textContent = message;
+                confirmModal.classList.remove('hidden');
+                confirmCallback = callback;
+            }
+
+            function hideModal() {
+                confirmModal.classList.add('hidden');
+                confirmCallback = null;
+            }
+
+            function showAlert(message, isError = false) {
+                customAlert.classList.toggle('bg-red-500', isError);
+                customAlert.classList.toggle('bg-cyan-500', !isError);
+                customAlertMessage.textContent = message;
+                customAlert.classList.remove('hidden');
+                setTimeout(() => {
+                    customAlert.classList.add('hidden');
+                }, 3000);
+            }
+
+            modalConfirmBtn.addEventListener('click', () => {
+                if (confirmCallback) {
+                    confirmCallback();
+                }
+                hideModal();
+            });
+
+            modalCancelBtn.addEventListener('click', hideModal);
+
+            // --- FUNÇÕES DE BANCO DE DADOS LOCAL (localStorage) ---
+            function savePlayers() {
+                localStorage.setItem('voleiAppPlayers', JSON.stringify(players));
+            }
+
+            function loadPlayers() {
+                const savedPlayers = localStorage.getItem('voleiAppPlayers');
+                if (savedPlayers) {
+                    players = JSON.parse(savedPlayers);
+                }
+            }
 
             // --- CORE FUNCTIONS ---
             function addPlayer(event) {
@@ -135,12 +216,45 @@
                 const name = playerNameInput.value.trim();
                 const skillRadio = document.querySelector('input[name="rating"]:checked');
                 if (!name || !skillRadio) {
-                    alert("Por favor, preencha o nome e a habilidade do jogador.");
+                    showAlert("Por favor, preencha o nome e a habilidade do jogador.", true);
                     return;
                 }
                 const skill = parseInt(skillRadio.value, 10);
-                players.push({ id: `p_${Date.now()}`, name, skill });
-                renderPlayersList();
+                const newPlayer = { id: `p_${Date.now()}`, name, skill };
+                
+                players.push(newPlayer);
+                savePlayers();
+
+                // --- NOVIDADE: Lógica para adicionar jogador com jogo em andamento ---
+                if (teams.length > 0) {
+                    // Jogo já começou, vamos adicionar o jogador a um time existente ou novo.
+                    let targetTeam = teams
+                        .filter(t => t.players.length < 4) // Pega todos os times incompletos
+                        .sort((a, b) => a.players.length - b.players.length)[0]; // Ordena para pegar o mais vazio primeiro
+
+                    if (targetTeam) {
+                        // Se encontrou um time incompleto, adiciona o jogador a ele.
+                        targetTeam.players.push(newPlayer);
+                        showAlert(`${name} foi adicionado ao ${targetTeam.name}!`);
+                    } else {
+                        // Se todos os times estão cheios, cria um novo time.
+                        const newTeamId = `t_${teams.length + 1}`;
+                        const newTeam = { 
+                            id: newTeamId, 
+                            name: `Time ${teams.length + 1}`, 
+                            players: [newPlayer], 
+                            wins: 0, 
+                            consecutiveWins: 0, 
+                            status: 'waiting' 
+                        };
+                        teams.push(newTeam);
+                        waitingQueue.push(newTeamId); // Adiciona o novo time à fila de espera
+                        showAlert(`${name} foi adicionado a um novo time (${newTeam.name})!`);
+                    }
+                }
+                // --- FIM DA NOVIDADE ---
+
+                renderAll();
                 addPlayerForm.reset();
                 playerNameInput.focus();
             }
@@ -151,7 +265,7 @@
                 if (players.length === 0) {
                     playersListDiv.innerHTML = '<p class="text-gray-500">Nenhum jogador cadastrado.</p>';
                 } else {
-                    players.forEach(player => {
+                    players.sort((a, b) => a.name.localeCompare(b.name)).forEach(player => {
                         const playerDiv = document.createElement('div');
                         playerDiv.className = 'bg-gray-700 p-2 rounded-lg flex justify-between items-center';
                         const stars = '★'.repeat(player.skill).padEnd(5, '☆');
@@ -163,18 +277,25 @@
 
             function drawTeams() {
                 if (players.length < 4) {
-                    alert("É necessário ter pelo menos 4 jogadores para iniciar um jogo.");
+                    showAlert("É necessário ter pelo menos 4 jogadores para o sorteio inicial.", true);
                     return;
                 }
+                if (teams.length > 0 && !confirm("Os times já foram sorteados. Deseja sortear tudo de novo? O progresso atual será perdido.")) {
+                    return;
+                }
+
                 resetState(false);
                 let sortedPlayers = [...players].sort(() => 0.5 - Math.random()).sort((a, b) => b.skill - a.skill);
                 const numTeams = Math.ceil(players.length / 4);
                 const numFullTeams = Math.floor(players.length / 4);
+                
                 for (let i = 0; i < numTeams; i++) {
                     teams.push({ id: `t_${i + 1}`, name: `Time ${i + 1}`, players: [], wins: 0, consecutiveWins: 0, status: 'waiting' });
                 }
+                
                 const playersForFullTeams = sortedPlayers.slice(0, numFullTeams * 4);
                 const fullTeams = teams.slice(0, numFullTeams);
+                
                 if (fullTeams.length > 0) {
                     let teamIndex = 0;
                     let direction = 1;
@@ -187,10 +308,12 @@
                         }
                     });
                 }
+                
                 if (numTeams > numFullTeams) {
                     const remainingPlayers = sortedPlayers.slice(numFullTeams * 4);
                     teams[numTeams - 1].players.push(...remainingPlayers);
                 }
+                
                 if (teams.length >= 2) {
                     onCourt = [teams[0].id, teams[1].id];
                     teams[0].status = 'on_court';
@@ -204,7 +327,6 @@
             }
 
             function registerLoss(losingTeamId) {
-                // At the start of a new round, reset any team that was rotated out
                 const previouslyRotatedTeam = teams.find(t => t.status === 'rotated_out');
                 if (previouslyRotatedTeam) {
                     previouslyRotatedTeam.status = 'waiting';
@@ -222,10 +344,9 @@
                 loser.consecutiveWins = 0;
                 let observation = '';
 
-                // --- 3-Win Streak Logic (CORRECTED) ---
                 if (winner.consecutiveWins >= 3) {
                     observation = `${winner.name} foi para o banco (3 vitórias seguidas).`;
-                    winner.status = 'rotated_out'; // Special status for one round
+                    winner.status = 'rotated_out';
                     winner.consecutiveWins = 0;
                     
                     loser.status = 'waiting';
@@ -235,7 +356,6 @@
                     waitingQueue.push(loser.id);
                     waitingQueue.push(winner.id);
 
-                    // --- Find next two teams transactionally ---
                     let nextMatchCandidates = [];
                     let movesToMake = [];
                     let availablePlayers = [...playersFromLoser].sort((a, b) => b.skill - a.skill);
@@ -275,7 +395,7 @@
                         loser.players.push(...playersFromLoser); // Revert
                         observation += ` Não foi possível formar a próxima partida.`;
                     }
-                } else { // --- Standard Rotation Logic ---
+                } else { // Standard Rotation
                     loser.status = 'waiting';
                     const losingPlayers = [...loser.players];
                     loser.players = [];
@@ -285,7 +405,7 @@
                     let challengerIndex = -1;
                     for (let i = 0; i < waitingQueue.length; i++) {
                         const potentialChallenger = teams.find(t => t.id === waitingQueue[i]);
-                        if (potentialChallenger.status === 'on_court' || potentialChallenger.id === loser.id) continue;
+                        if (potentialChallenger.status === 'on_court' || potentialChallenger.id === loser.id || potentialChallenger.status === 'rotated_out') continue;
                         const neededPlayers = 4 - potentialChallenger.players.length;
                         if (neededPlayers === 0) {
                             challengerTeam = potentialChallenger;
@@ -294,7 +414,6 @@
                             break;
                         } else if (losingPlayers.length >= neededPlayers) {
                             const playersToMove = [...losingPlayers].sort((a, b) => b.skill - a.skill).splice(0, neededPlayers);
-                            losingPlayers.splice(0, neededPlayers); // This is not quite right, but works for now.
                             potentialChallenger.players.push(...playersToMove);
                             observation = `${playersToMove.map(p=>p.name).join(', ')} completaram o ${potentialChallenger.name}.`;
                             challengerTeam = potentialChallenger;
@@ -334,10 +453,11 @@
             }
 
             function resetGame() {
-                if (confirm("Tem certeza que deseja resetar todo o jogo? A lista de jogadores será APAGADA.")) {
+                showModal("Tem certeza que deseja resetar todo o jogo? A lista de jogadores e o progresso serão APAGADOS.", () => {
                     resetState(true);
+                    localStorage.removeItem('voleiAppPlayers');
                     renderAll();
-                }
+                });
             }
             
             function resetState(fullReset = true) {
@@ -358,6 +478,10 @@
 
             function renderTeamsAndCourt() {
                 teamsDisplayDiv.innerHTML = '';
+                if (teams.length === 0) {
+                    teamsDisplayDiv.innerHTML = '<p class="text-gray-400 md:col-span-2 text-center">Aguardando o sorteio dos times...</p>';
+                    return;
+                }
                 const onCourtTeams = teams.filter(t => t.status === 'on_court');
                 const waitingTeams = teams.filter(t => t.status !== 'on_court').sort((a,b) => b.players.length - a.players.length);
                 let courtHtml = '<div class="md:col-span-2 space-y-6"><h3 class="text-xl font-semibold text-green-400 text-center">EM QUADRA</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-6">';
@@ -389,7 +513,7 @@
                 }
                 card += '</ul>';
                 if (isOnCourt && onCourt.length > 1) {
-                    card += `<button onclick="registerLoss('${team.id}')" class="mt-auto w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors duration-300 text-sm">Registrar Derrota</button>`;
+                    card += `<button onclick="window.registerLoss('${team.id}')" class="mt-auto w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors duration-300 text-sm">Registrar Derrota</button>`;
                 }
                 card += '</div>';
                 return card;
@@ -414,6 +538,9 @@
             drawTeamsBtn.addEventListener('click', drawTeams);
             resetGameBtn.addEventListener('click', resetGame);
             window.registerLoss = registerLoss;
+            
+            // --- INITIAL LOAD ---
+            loadPlayers();
             renderAll();
         });
     </script>
